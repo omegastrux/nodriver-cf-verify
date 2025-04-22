@@ -1,0 +1,9 @@
+This project includes the use of the following open-source software:
+
+- nodriver (https://github.com/ultrafunkamsterdam/nodriver)
+  Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
+
+No changes have been made to the nodriver source code.
+This project communicates externally using nodriver's public API.
+
+We are not affiliated with the nodriver project or its authors.
