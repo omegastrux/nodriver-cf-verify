@@ -5,8 +5,8 @@ async def main() -> None:
     browser: nodriver.Browser = await nodriver.start()
     browser_tab: nodriver.Tab = await browser.get("https://2captcha.com/demo/cloudflare-turnstile-challenge")
 
-    CFB: CFBypass = CFBypass(_browser_tab = browser_tab)
-    result = await CFB.bypass()
+    CFB: CFBypass = CFBypass(_browser_tab = browser_tab, _debug = True)
+    result = await CFB.bypass(_max_tries = 10, _interval_between_tries = 1)
 
     if result:
         print("Cloudflare has been bypassed.")

@@ -48,7 +48,7 @@ You can also install it manually:
         browser: nodriver.Browser = await nodriver.start()
         browser_tab: nodriver.Tab = await browser.get("https://2captcha.com/demo/cloudflare-turnstile-challenge")
 
-        CFB: CFBypass = CFBypass(_browser_tab = browser_tab)
+        CFB: CFBypass = CFBypass(_browser_tab = browser_tab, _debug = True)
         result = await CFB.bypass()
 
         if result:
@@ -59,14 +59,6 @@ You can also install it manually:
 
     nodriver.loop().run_until_complete(main())
 ```
-
-
-## 🧠 Configuration Options
-
-| Parameter                  | Description                      | Default |
-|----------------------------|----------------------------------|---------|
-| `_max_tries`               | Maximum number of retry attempts | `10`    |
-| `_interval_between_tries`  | Seconds between retries          | `1`     |
 
 
 ## 📄 License
