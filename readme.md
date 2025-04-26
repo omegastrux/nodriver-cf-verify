@@ -49,7 +49,7 @@ You can also install it manually:
         browser_tab: nodriver.Tab = await browser.get("https://2captcha.com/demo/cloudflare-turnstile-challenge")
 
         CFB: CFBypass = CFBypass(_browser_tab = browser_tab, _debug = True)
-        result = await CFB.bypass(_max_tries = 10, _interval_between_tries = 1, _reload_page_after_n_tries = 0)
+        result = await CFB.bypass(_max_retries = 10, _interval_between_retries = 1, _reload_page_after_n_retries = 0)
 
         if result:
             print("Cloudflare has been bypassed.")

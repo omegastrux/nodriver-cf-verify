@@ -29,17 +29,17 @@ class CFBypass:
         if not self.INSTANCE_ID:
             await self.get_instance_id()
 
-        print(f"[CFBypass] {self.INSTANCE_ID}:{message}")
+        print(f"[CFBypass] {self.INSTANCE_ID}: {message}")
 
     async def get_instance_id(self) -> str | None:
-        tries: int = 0
-        max_tries: int = 5
+        retries: int = 0
+        max_retries: int = 5
 
-        while tries < max_tries:
-            tries += 1
+        while retries < max_retries:
+            retries += 1
 
             try:
-                self.INSTANCE_ID = self.INSTANCE_ID = f"({self.BROWSER_TAB.target.target_id[-5:]}: {self.BROWSER_TAB.target.url.split("/")[2]})"
+                self.INSTANCE_ID = self.INSTANCE_ID = f"({self.BROWSER_TAB.target.target_id[-5:]}-{self.BROWSER_TAB.target.url.split("/")[2]})"
                 
                 if self.BROWSER_TAB.target.url:
                     return self.INSTANCE_ID
@@ -47,7 +47,7 @@ class CFBypass:
             except:
                 pass
 
-            await asyncio.sleep(.3)
+            await asyncio.sleep(0.3)
 
         return None
 
@@ -76,20 +76,20 @@ class CFBypass:
             await self.show_log(e)
             return None
 
-    async def bypass(self, _max_tries: int = 10, _interval_between_tries: float | int = 1,  _reload_page_after_n_tries = 0) -> bool:
+    async def bypass(self, _max_retries: int = 10, _interval_between_retries: float | int = 1,  _reload_page_after_n_retries = 0) -> bool:
         await self.show_log("Bypassing cloudflare...")
 
-        tries: int = 0
-        while tries < _max_tries:
-            tries += 1
+        retries: int = 0
+        while retries < _max_retries:
+            retries += 1
 
-            await self.show_log(f"Trying... {tries}/{_max_tries}")
+            await self.show_log(f"Trying... {retries}/{_max_retries}")
             
-            if _reload_page_after_n_tries > 0 and tries % _reload_page_after_n_tries == 0 and tries > 0 and tries < _max_tries:
+            if _reload_page_after_n_retries > 0 and retries % _reload_page_after_n_retries == 0 and retries > 0 and retries < _max_retries:
                 await self.show_log(f"Reloading page...")
                 await self.BROWSER_TAB.reload()
 
-            await asyncio.sleep(delay = _interval_between_tries)
+            await asyncio.sleep(delay = _interval_between_retries)
 
             iframe: Element | None = await self.find_cloudflare_iframe()
             try:
