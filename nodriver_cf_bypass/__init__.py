@@ -19,25 +19,45 @@
 from nodriver import Tab, Element
 import asyncio
 
-
 class CFBypass:
     def __init__(self, _browser_tab: Tab, _debug: bool = False) -> None:
         self.BROWSER_TAB: Tab = _browser_tab
-        self.DEBUG = _debug
+        self.DEBUG: bool = _debug
+        self.INSTANCE_ID: str | None = None
+    
+    async def show_log(self, message: str) -> None:
+        if not self.INSTANCE_ID:
+            await self.get_instance_id()
+
+        print(f"[CFBypass] {self.INSTANCE_ID}:{message}")
+
+    async def get_instance_id(self) -> str | None:
+        tries: int = 0
+        max_tries: int = 5
+
+        while tries < max_tries:
+            tries += 1
+
+            try:
+                self.INSTANCE_ID = self.INSTANCE_ID = f"({self.BROWSER_TAB.target.target_id[-5:]}: {self.BROWSER_TAB.target.url.split("/")[2]})"
+                
+                if self.BROWSER_TAB.target.url:
+                    return self.INSTANCE_ID
+
+            except:
+                pass
+
+            await asyncio.sleep(.3)
+
+        return None
+
 
     async def is_cloudflare_presented(self) -> bool:
         try:
-            obvious_cloudflare_script_source: str = "cdn-cgi/challenge-platform/h/g/orchestrate/chl_page/v1?ray"
-            script_sources: list[str] = [script.get("src") for script in await self.BROWSER_TAB.find_all("script") if script.get("src")]
-
-            for source in script_sources:
-                if obvious_cloudflare_script_source in source:
-                    return True
-
-            return False
-
+            obvious_script: str = "cdn-cgi/challenge-platform/h/g/orchestrate/chl_page/v1?ray"
+            return bool([script.get("src") for script in await self.BROWSER_TAB.find_all("script") if obvious_script in str(script.get("src"))])
         except Exception as e:
-            print(e) if self.DEBUG else None
+            await self.show_log(e)
             return True
 
     async def find_cloudflare_iframe(self) -> Element | None:
@@ -53,30 +73,40 @@ class CFBypass:
             return None
 
         except Exception as e:
-            print(e) if self.DEBUG else None
+            await self.show_log(e)
             return None
 
-    async def bypass(self, _max_tries: int = 10, _interval_between_tries: float | int = 1) -> bool:
-        print("[CFBypass] Bypassing cloudflare...") if self.DEBUG else None
+    async def bypass(self, _max_tries: int = 10, _interval_between_tries: float | int = 1,  _reload_page_after_n_tries = 0) -> bool:
+        await self.show_log("Bypassing cloudflare...")
 
         tries: int = 0
-        while tries < _max_tries and await self.is_cloudflare_presented():
+        while tries < _max_tries:
             tries += 1
-            print(f"[CFBypass] Trying... {tries}/{_max_tries}") if self.DEBUG else None
+
+            await self.show_log(f"Trying... {tries}/{_max_tries}")
+            
+            if _reload_page_after_n_tries > 0 and tries % _reload_page_after_n_tries == 0 and tries > 0 and tries < _max_tries:
+                await self.show_log(f"Reloading page...")
+                await self.BROWSER_TAB.reload()
 
             await asyncio.sleep(delay = _interval_between_tries)
 
-            iframe = await self.find_cloudflare_iframe()
+            iframe: Element | None = await self.find_cloudflare_iframe()
             try:
                 await iframe.mouse_click()
-            except Exception as e:
-                print(e) if self.DEBUG else None
-        
-        if self.DEBUG:
-            if await self.is_cloudflare_presented():
-                print("[CFBypass] Cloudflare could not be bypassed for an unknown reason.")
-            
-            else:
-                print("[CFBypass] Cloudflare has been bypassed successfully.")
+
+            except AttributeError as e: # There is no cloudflare iframe on site.
+                await self.show_log(e)
+                if not await self.is_cloudflare_presented():
+                    break
+
+            except Exception as e: # The iframe could not be loaded on site.
+                await self.show_log(e)
+
+        if await self.is_cloudflare_presented():
+            await self.show_log("Cloudflare could not be bypassed for an unknown reason.")
+
+        else:
+            await self.show_log("Cloudflare has been bypassed successfully.")
 
         return not await self.is_cloudflare_presented() # Return True if cloudflare was bypassed successfully.
