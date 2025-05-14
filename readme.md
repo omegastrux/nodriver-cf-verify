@@ -83,6 +83,10 @@ This software is based on or makes use of:
 No changes were made to nodriver's source code.
 This extension communicates externally using nodriver’s public API.
 
+## ⚠️ Disclaimer
+
+The authors are not responsible for any misuse of this project. Use at your own risk. This code is provided for educational and research purposes only. Ensure your usage complies with all applicable laws and terms of service.
+
 
 ## 📬 Contact
 
