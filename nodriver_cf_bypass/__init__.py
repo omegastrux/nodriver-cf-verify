@@ -39,7 +39,7 @@ class CFBypass:
             retries += 1
 
             try:
-                self.INSTANCE_ID = self.INSTANCE_ID = f"({self.BROWSER_TAB.target.target_id[-5:]}-{self.BROWSER_TAB.target.url.split("/")[2]})"
+                self.INSTANCE_ID = self.INSTANCE_ID = f"({self.BROWSER_TAB.target.target_id[-5:]}-{self.BROWSER_TAB.target.url.split('/')[2]})"
                 
                 if self.BROWSER_TAB.target.url:
                     return self.INSTANCE_ID
