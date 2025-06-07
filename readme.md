@@ -41,23 +41,27 @@ You can also install it manually:
 ## 💻 Example Usage
 
 ```python
-    import nodriver
-    from nodriver_cf_bypass import CFBypass
+import nodriver, time
+from nodriver_cf_bypass import CFBypass
 
-    async def main() -> None:
-        browser: nodriver.Browser = await nodriver.start()
-        browser_tab: nodriver.Tab = await browser.get("https://2captcha.com/demo/cloudflare-turnstile-challenge")
+async def main() -> None:
+    browser: nodriver.Browser = await nodriver.start()
+    browser_tab: nodriver.Tab = await browser.get("https://nowsecure.nl")
 
-        CFB: CFBypass = CFBypass(_browser_tab = browser_tab, _debug = True)
-        result = await CFB.bypass(_max_retries = 10, _interval_between_retries = 1, _reload_page_after_n_retries = 0)
+    start = time.perf_counter()
 
-        if result:
-            print("Cloudflare has been bypassed.")
-            return None
+    cf_bypass: CFBypass = CFBypass(_browser_tab=browser_tab, _debug=True)
+    result = await cf_bypass.bypass(_max_retries=10, _interval_between_retries=1, _reload_page_after_n_retries=0)
 
-        print("Couldn't bypass cloudflare for some reason.")
+    duration = time.perf_counter() - start
 
-    nodriver.loop().run_until_complete(main())
+    if result:
+        print(f"Cloudflare was successfully bypassed in {duration:.2f} seconds.")
+        return
+    
+    print(f"Failed to bypass Cloudflare. Elapsed time: {duration:.2f} seconds.")
+
+nodriver.loop().run_until_complete(main())
 ```
 
 
