@@ -17,96 +17,218 @@
 
 
 from nodriver import Tab, Element
-import asyncio
+from datetime import datetime
+from typing import Optional, Any
+import asyncio, time
 
-class CFBypass:
+class CFLogger:
+    def __init__(self, _class_name: str, _debug: bool = False) -> None:
+        self.debug: bool = _debug
+        self.class_name: str = _class_name
+
+    async def log(self, _message: str) -> None:
+        """
+        Simple logger for CFBypass
+        """
+
+        if not self.debug:
+            return
+
+        print(f"({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) [{self.class_name}]: {_message}")
+
+
+class CFUtil:
+    def __init__(self, _browser_tab: Tab, _debug = False) -> None:
+        self.debug: bool = _debug
+        self.browser_tab: Tab = _browser_tab
+        self.cf_logger: CFLogger = CFLogger(_class_name = self.__class__.__name__, _debug = self.debug)
+
+    async def create_instance_id(self, _max_retries: int = 10) -> Optional[str]:
+        """
+        CFUtil method for creating the instance_id from target_id and url.
+        """
+
+        for retry_count in range(1, _max_retries + 1):
+            target_id: Optional[str] = self.browser_tab.target.target_id
+            target_url: Optional[str] = self.browser_tab.target.url
+
+            if not target_id or not target_url:
+                await asyncio.sleep(0.05)
+                continue
+
+            instance_id: Optional[str] = f"{target_id[-5:]}-{target_url.split('/')[2]}"
+            await self.cf_logger.log(f"Created instance_id: {instance_id}")
+            return instance_id
+
+        await self.cf_logger.log(f"instance_id could not be created.")
+
+    async def run_js(self, javascript: str, return_value: bool = True) -> Any:
+        result: Any = await self.browser_tab.evaluate(expression = javascript)
+
+        if not return_value:
+            return
+
+        if isinstance(result, list):
+            return [value['value'] for value in result]
+
+        return result
+
+class CFHelper:
     def __init__(self, _browser_tab: Tab, _debug: bool = False) -> None:
-        self.BROWSER_TAB: Tab = _browser_tab
-        self.DEBUG: bool = _debug
-        self.INSTANCE_ID: str | None = None
-    
-    async def show_log(self, message: str) -> None:
-        if not self.INSTANCE_ID:
-            await self.get_instance_id()
+        self.debug: bool = _debug
+        self.browser_tab: Tab = _browser_tab
 
-        print(f"[CFBypass] {self.INSTANCE_ID}: {message}")
+        self.cf_util: CFUtil = CFUtil(self.browser_tab, _debug = self.debug)
+        self.cf_logger: CFLogger = CFLogger(_class_name = self.__class__.__name__, _debug = self.debug)
 
-    async def get_instance_id(self) -> str | None:
-        retries: int = 0
-        max_retries: int = 5
+    async def is_cloudflare_presented(self, _max_retries: int = 5, _interval_between_retries: float = 0.1) -> bool:
+        """
+        Checks if Cloudflare challenge script is present on the page.
+        """
 
-        while retries < max_retries:
-            retries += 1
+        obv_things: list[str] = ["challenges.cloudflare.com", "cdn-cgi/challenge-platform", "turnstile/v0/api.js"]
+        urls: list[str] = []
 
-            try:
-                self.INSTANCE_ID = f"({self.BROWSER_TAB.target.target_id[-5:]}-{self.BROWSER_TAB.target.url.split('/')[2]})"
-                
-                if self.BROWSER_TAB.target.url:
-                    return self.INSTANCE_ID
+        for i in range(_max_retries):
+            for i in range(5):
+                try:
+                    if "turnstile" in await self.browser_tab.evaluate("document.title"):
+                        return True
 
-            except:
-                pass
+                    # Using javascript instead if find_all, because it's a lot faster than method used in nodriver
+                    urls: list[str] = await self.cf_util.run_js("[...document.querySelectorAll('script[src]')].map(script => script.src)", return_value = True)
+                    if not urls:
+                        continue
 
-            await asyncio.sleep(0.3)
+                    break
 
-        return None
+                except Exception as e:
+                    await self.cf_logger.log(f"Error occured while fetching urls from site: {e}")
 
+                await asyncio.sleep(0.1)
 
-    async def is_cloudflare_presented(self) -> bool:
-        try:
-            obvious_script: str = "cdn-cgi/challenge-platform/h/g/orchestrate/chl_page/v1?ray"
-            return bool([script.get("src") for script in await self.BROWSER_TAB.find_all("script") if obvious_script in str(script.get("src"))])
-        except Exception as e:
-            await self.show_log(e)
-            return True
+            if len(urls) == 0:
+                await self.cf_logger.log(f"No urls were fetched from site.")
+                continue
 
-    async def find_cloudflare_iframe(self) -> Element | None:
-        try:
-            obvious_cloudflare_iframe_source: str = "challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/if/ov2/av0/rcv"
-            
-            iframes: list[Element] = [iframe for iframe in await self.BROWSER_TAB.find_all("iframe") if iframe.get("src")]
-
-            for iframe in iframes:
-                if obvious_cloudflare_iframe_source in iframe.get("src"):
-                    return iframe
-            
-            return None
-
-        except Exception as e:
-            await self.show_log(e)
-            return None
-
-    async def bypass(self, _max_retries: int = 10, _interval_between_retries: float | int = 1,  _reload_page_after_n_retries = 0) -> bool:
-        await self.show_log("Bypassing cloudflare...")
-
-        retries: int = 0
-        while retries < _max_retries:
-            retries += 1
-
-            await self.show_log(f"Trying... {retries}/{_max_retries}")
-            
-            if _reload_page_after_n_retries > 0 and retries % _reload_page_after_n_retries == 0 and retries > 0 and retries < _max_retries:
-                await self.show_log(f"Reloading page...")
-                await self.BROWSER_TAB.reload()
+            for thing in obv_things:
+                for url in urls:
+                    if thing in url:
+                        return True
 
             await asyncio.sleep(delay = _interval_between_retries)
 
-            iframe: Element | None = await self.find_cloudflare_iframe()
+        return False
+
+    async def find_cloudflare_iframe(self) -> Optional[Element]:
+        """
+        Searches for an iframe likely related to Cloudflare challenge.
+        Returns the iframe element if found, otherwise None.
+        """
+        
+        try:
+            iframes: list[Element] = [iframe for iframe in await self.browser_tab.find_all("iframe") if iframe.attrs.get("src")]
+
+            for iframe in iframes:
+                iframe_id: str = iframe.attrs.get("id", "").lower()
+                iframe_class: str = iframe.attrs.get("class", "").lower()
+
+                if "cf-" in iframe_id or "turnstile" in iframe_id or "cf-" in iframe_class:
+                    await self.cf_logger.log(
+                        f"Found potential Cloudflare iframe with {'id=' + iframe_id if iframe_id else ''}"
+                        f"{' and ' if iframe_id and iframe_class else ''}"
+                        f"{'class=' + iframe_class if iframe_class else ''}"
+                    )
+                    return iframe
+
+        except Exception as e:
+            await self.cf_logger.log(f"Error occurred: {e}")
+
+
+class CFBypass:
+    def __init__(self, _browser_tab: Tab, _debug: bool = False) -> None:
+        """
+        Initializes CFBypass with the given browser tab and debug flag.
+        Raises ValueError if arguments are of incorrect types.
+        """
+
+        if not isinstance(_browser_tab, Tab):
+            raise ValueError(f"_browser_tab parameter must be an instance of Tab.")
+
+        if not isinstance(_debug, bool):
+            raise ValueError(f"_debug parameter must be a bool.")
+
+        self.debug: bool = _debug
+        self.browser_tab: Tab = _browser_tab
+        self.instance_id: Optional[str] = None
+
+        self.cf_util: CFUtil = CFUtil(_browser_tab = self.browser_tab, _debug = self.debug)
+        self.cf_helper: CFHelper = CFHelper(_browser_tab = self.browser_tab, _debug = self.debug)
+        self.cf_logger: CFLogger = CFLogger(self.__class__.__name__, _debug = self.debug)
+
+    async def log(self, message: str) -> None:
+        """
+        Logs a message prefixed by the instance ID.
+        If the instance ID is not set, it attempts to create it before logging.
+        """
+
+        if not self.instance_id:
+            self.instance_id = await self.cf_util.create_instance_id()
+
+        await self.cf_logger.log(f"<{self.instance_id}>: {message}")
+
+    async def bypass(self, _max_retries = 10, _interval_between_retries = 1, _reload_page_after_n_retries = 0) -> bool:
+        """
+        Attempts to bypass Cloudflare challenge by retrying up to _max_retries times.
+        Optionally reloads the page every _reload_page_after_n_retries attempts.
+        """
+        
+        await self.log("Bypassing cloudflare has started.")
+
+        for retry_count in range(1, _max_retries + 1):
+            await self.log(f"Trying to bypass cloudflare. Attempt {retry_count} of {_max_retries}.")
+
+            await asyncio.sleep(delay = _interval_between_retries)
+
+            if retry_count < _max_retries and _reload_page_after_n_retries > 0 and retry_count % _reload_page_after_n_retries == 0:
+                await self.log(f"Reloading page... Attempt {retry_count} of {_max_retries}, reload interval {_reload_page_after_n_retries}.")
+                await self.browser_tab.reload()
+
+            await asyncio.sleep(delay = _interval_between_retries)
+
+            if not await self.cf_helper.is_cloudflare_presented():
+                self.log(f"Cloudflare is not presented on site. No bypass needed.")
+                return True
+
+            iframe: Optional[Element] = await self.cf_helper.find_cloudflare_iframe()
+
+            if not iframe:
+                await self.log("No cloudflare iframe found.")
+
+                if not await self.cf_helper.is_cloudflare_presented():
+                    await self.log("Cloudflare has been bypassed successfully (no iframe required).")
+                    return True
+
+                continue
+
             try:
                 await iframe.mouse_click()
+                await self.log("Cloudflare iframe has been clicked.")
 
-            except AttributeError as e: # There is no cloudflare iframe on site.
-                await self.show_log(e)
-                if not await self.is_cloudflare_presented():
-                    break
+            except Exception as e:
+                await self.log(f"Error while clicking iframe: {e}")
 
-            except Exception as e: # The iframe could not be loaded on site.
-                await self.show_log(e)
+                if "could not find position for" in str(e):
+                    await self.log(f"Cloudflare iframe could not load properly.")
+                    continue
 
-        if await self.is_cloudflare_presented():
-            await self.show_log("Cloudflare could not be bypassed for an unknown reason.")
+                if not await self.cf_helper.is_cloudflare_presented():
+                    await self.log("Cloudflare has been bypassed successfully despite error.")
+                    return True
 
-        else:
-            await self.show_log("Cloudflare has been bypassed successfully.")
+        if await self.cf_helper.is_cloudflare_presented():
+            await self.log("Cloudflare could not be bypassed for an unknown reason.")
+            return False
 
-        return not await self.is_cloudflare_presented() # Return True if cloudflare was bypassed successfully.
+        await self.log("Cloudflare has been bypassed successfully.")
+        return True
