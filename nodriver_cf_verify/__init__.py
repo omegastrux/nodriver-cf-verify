@@ -1,18 +1,18 @@
-# This file is part of nodriver-cf-bypass.
+# This file is part of nodriver-cf-verify.
 # Copyright (c) 2025 KlozetLabs
 #
-# nodriver-cf-bypass is free software: you can redistribute it and/or
+# nodriver-cf-verify is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
 # as published by the Free Software Foundation, either version 3 of
 # the License, or (at your option) any later version.
 #
-# nodriver-cf-bypass is distributed in the hope that it will be useful,
+# nodriver-cf-verify is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
-# along with nodriver-cf-bypass. If not, see <https://www.gnu.org/licenses/>.
+# along with nodriver-cf-verify. If not, see <https://www.gnu.org/licenses/>.
 
 
 
@@ -28,7 +28,7 @@ class CFLogger:
 
     async def log(self, _message: str) -> None:
         """
-        Simple logger for CFBypass
+        Simple logger for CFVerify
         """
 
         if not self.debug:
@@ -145,10 +145,10 @@ class CFHelper:
             await self.cf_logger.log(f"Error occurred: {e}")
 
 
-class CFBypass:
+class CFVerify:
     def __init__(self, _browser_tab: Tab, _debug: bool = False) -> None:
         """
-        Initializes CFBypass with the given browser tab and debug flag.
+        Initializes CFVerify with the given browser tab and debug flag.
         Raises ValueError if arguments are of incorrect types.
         """
 
@@ -177,16 +177,16 @@ class CFBypass:
 
         await self.cf_logger.log(f"<{self.instance_id}>: {message}")
 
-    async def bypass(self, _max_retries = 10, _interval_between_retries = 1, _reload_page_after_n_retries = 0) -> bool:
+    async def verify(self, _max_retries = 10, _interval_between_retries = 1, _reload_page_after_n_retries = 0) -> bool:
         """
-        Attempts to bypass Cloudflare challenge by retrying up to _max_retries times.
+        Attempts to verify Cloudflare challenge by retrying up to _max_retries times.
         Optionally reloads the page every _reload_page_after_n_retries attempts.
         """
         
-        await self.log("Bypassing cloudflare has started.")
+        await self.log("Verifying cloudflare has started.")
 
         for retry_count in range(1, _max_retries + 1):
-            await self.log(f"Trying to bypass cloudflare. Attempt {retry_count} of {_max_retries}.")
+            await self.log(f"Trying to verify cloudflare. Attempt {retry_count} of {_max_retries}.")
 
             await asyncio.sleep(delay = _interval_between_retries)
 
@@ -197,7 +197,7 @@ class CFBypass:
             await asyncio.sleep(delay = _interval_between_retries)
 
             if not await self.cf_helper.is_cloudflare_presented():
-                await self.log(f"Cloudflare is not presented on site. No bypass needed.")
+                await self.log(f"Cloudflare is not presented on site. No verify needed.")
                 return True
 
             iframe: Optional[Element] = await self.cf_helper.find_cloudflare_iframe()
@@ -206,7 +206,7 @@ class CFBypass:
                 await self.log("No cloudflare iframe found.")
 
                 if not await self.cf_helper.is_cloudflare_presented():
-                    await self.log("Cloudflare has been bypassed successfully (no iframe required).")
+                    await self.log("Cloudflare has been verified successfully (no iframe required).")
                     return True
 
                 continue
@@ -223,12 +223,12 @@ class CFBypass:
                     continue
 
                 if not await self.cf_helper.is_cloudflare_presented():
-                    await self.log("Cloudflare has been bypassed successfully despite error.")
+                    await self.log("Cloudflare has been verified successfully despite error.")
                     return True
 
         if await self.cf_helper.is_cloudflare_presented():
-            await self.log("Cloudflare could not be bypassed for an unknown reason.")
+            await self.log("Cloudflare could not be verified for an unknown reason.")
             return False
 
-        await self.log("Cloudflare has been bypassed successfully.")
+        await self.log("Cloudflare has been verified successfully.")
         return True

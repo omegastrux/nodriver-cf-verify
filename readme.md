@@ -1,12 +1,12 @@
-# nodriver-cf-bypass
+# nodriver-cf-verify
 
-A lightweight async extension for `nodriver` to detect and bypass Cloudflare Turnstile challenges.
+A lightweight async extension for `nodriver` to detect and verify Cloudflare Turnstile challenges.
 
 
 ## 🚀 Description
 
-`nodriver-cf-bypass` is a simple plugin for the `nodriver` project.
-It automatically detects if a webpage is protected by a Cloudflare Turnstile challenge and attempts to bypass it using the browser automation interface provided by nodriver.
+`nodriver-cf-verify` is a simple plugin for the `nodriver` project.
+It automatically detects if a webpage is protected by a Cloudflare Turnstile challenge and attempts to verify it using the browser automation interface provided by nodriver.
 
 This extension is useful when automating headless access to pages protected by Cloudflare's JS-based or iframe-based turnstiles.
 
@@ -42,7 +42,7 @@ You can also install it manually:
 
 ```python
 import nodriver, time
-from nodriver_cf_bypass import CFBypass
+from nodriver_cf_verify import CFVerify
 
 async def main() -> None:
     browser: nodriver.Browser = await nodriver.start()
@@ -50,16 +50,16 @@ async def main() -> None:
 
     start: float = time.perf_counter()
 
-    cf_bypass: CFBypass = CFBypass(_browser_tab=browser_tab, _debug=True)
-    result: bool = await cf_bypass.bypass(_max_retries=10, _interval_between_retries=1, _reload_page_after_n_retries=0)
+    cf_verify: CFVerify = CFVerify(_browser_tab=browser_tab, _debug=True)
+    result: bool = await cf_verify.verify(_max_retries=10, _interval_between_retries=1, _reload_page_after_n_retries=0)
 
     duration: float = (time.perf_counter() - start)
 
     if result:
-        print(f"Cloudflare was successfully bypassed in {duration:.2f} seconds.")
+        print(f"Cloudflare was successfully verified in {duration:.2f} seconds.")
         return
     
-    print(f"Failed to bypass Cloudflare. Elapsed time: {duration:.2f} seconds.")
+    print(f"Failed to verify Cloudflare. Elapsed time: {duration:.2f} seconds.")
 
 nodriver.loop().run_until_complete(main())
 ```
