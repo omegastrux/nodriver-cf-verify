@@ -32,7 +32,7 @@ This extension is useful when automating headless access to pages protected by C
 Install the required dependencies using pip:
 - pip install -r requirements.txt
 
-Make sure `nodriver` is available in your environment.  
+Make sure `nodriver` is available in your environment.
 
 You can also install it manually:
 - pip install nodriver
@@ -86,6 +86,7 @@ This software is based on or makes use of:
 
 No changes were made to nodriver's source code.
 This extension communicates externally using nodriver’s public API.
+
 
 ## ⚠️ Disclaimer
 
