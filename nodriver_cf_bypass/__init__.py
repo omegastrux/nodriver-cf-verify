@@ -19,7 +19,7 @@
 from nodriver import Tab, Element
 from datetime import datetime
 from typing import Optional, Any
-import asyncio, time
+import asyncio
 
 class CFLogger:
     def __init__(self, _class_name: str, _debug: bool = False) -> None:
