@@ -197,7 +197,7 @@ class CFBypass:
             await asyncio.sleep(delay = _interval_between_retries)
 
             if not await self.cf_helper.is_cloudflare_presented():
-                self.log(f"Cloudflare is not presented on site. No bypass needed.")
+                await self.log(f"Cloudflare is not presented on site. No bypass needed.")
                 return True
 
             iframe: Optional[Element] = await self.cf_helper.find_cloudflare_iframe()
