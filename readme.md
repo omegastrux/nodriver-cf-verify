@@ -45,10 +45,6 @@ import nodriver, time
 from nodriver_cf_bypass import CFBypass
 
 async def main() -> None:
-import nodriver, time
-from nodriver_cf_bypass import CFBypass
-
-async def main() -> None:
     browser: nodriver.Browser = await nodriver.start()
     browser_tab: nodriver.Tab = await browser.get("https://nowsecure.nl")
 
