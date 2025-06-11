@@ -95,5 +95,5 @@ The authors are not responsible for any misuse of this project. Use at your own 
 
 ## 📬 Contact
 
-Built by [KlozetLabs](https://github.com/KlozetLabs).
+Built by [OMEGASTRUX](https://github.com/omegastrux).
 If you have questions, ideas, or feedback — open an issue or reach out.

@@ -1,5 +1,5 @@
 # This file is part of nodriver-cf-verify.
-# Copyright (c) 2025 KlozetLabs
+# Copyright (c) 2025 OMEGASTRUX
 #
 # nodriver-cf-verify is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
