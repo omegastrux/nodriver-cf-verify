@@ -193,8 +193,7 @@ class CFVerify:
             if retry_count < _max_retries and _reload_page_after_n_retries > 0 and retry_count % _reload_page_after_n_retries == 0:
                 await self.log(f"Reloading page... Attempt {retry_count} of {_max_retries}, reload interval {_reload_page_after_n_retries}.")
                 await self.browser_tab.reload()
-
-            await asyncio.sleep(delay = _interval_between_retries)
+                continue
 
             if not await self.cf_helper.is_cloudflare_presented():
                 await self.log(f"Cloudflare is not presented on site. No verify needed.")
