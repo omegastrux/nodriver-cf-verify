@@ -16,10 +16,56 @@
 
 
 
-from nodriver import Tab, Element
-from datetime import datetime
-from typing import Optional, Any
 import asyncio
+from datetime import datetime
+from typing import Optional, Any, Union
+
+
+class CFLibUtil:
+    def __init__(self):
+        """
+        Initialize CFLibUtil for nodriver and zendriver support.
+        Unfortunately this causes warnings with types.
+        """
+
+        try:
+            import nodriver
+        except ImportError:
+            nodriver = None
+
+        try:
+            import zendriver
+        except ImportError:
+            zendriver = None
+
+        if not nodriver and not zendriver:
+            raise ImportError("You need nodriver or zendriver installed to use this script.")
+
+        if nodriver and zendriver:
+            self.Browser = Union[nodriver.Browser, zendriver.Browser]
+            self.Tab = Union[nodriver.Tab, zendriver.Tab]
+            self.Element = Union[nodriver.Element, zendriver.Element]
+            return self._set_globally()
+
+        if nodriver:
+            self.Browser = nodriver.Browser
+            self.Tab = nodriver.Tab
+            self.Element = nodriver.Element
+
+        if zendriver:
+            self.Browser = zendriver.Browser
+            self.Tab = zendriver.Tab
+            self.Element = zendriver.Element
+
+        self._set_globally()
+
+    def _set_globally(self):
+        global Browser, Tab, Element
+        Browser, Tab, Element = self.Browser, self.Tab, self.Element
+
+# Try to load available web driver libraries and set types globally
+CFLibUtil()
+
 
 class CFLogger:
     def __init__(self, _class_name: str, _debug: bool = False) -> None:
@@ -52,11 +98,16 @@ class CFUtil:
             target_id: Optional[str] = self.browser_tab.target.target_id
             target_url: Optional[str] = self.browser_tab.target.url
 
+            # That's for nodriver support
+            if "://" in target_url:
+                target_url = target_url.split("/")[2]
+
             if not target_id or not target_url:
                 await asyncio.sleep(0.05)
                 continue
 
-            instance_id: Optional[str] = f"{target_id[-5:]}-{target_url.split('/')[2]}"
+            # instance_id: Optional[str] = f"{target_id[-5:]}-{target_url.split('/')[2]}"
+            instance_id: Optional[str] = f"{target_id[-5:]}-{target_url}"
             await self.cf_logger.log(f"Created instance_id: {instance_id}")
             return instance_id
 
@@ -68,10 +119,20 @@ class CFUtil:
         if not return_value:
             return
 
-        if isinstance(result, list):
-            return [value['value'] for value in result]
+        if not isinstance(result, list):
+            return result
 
-        return result
+        results = []
+        for value in result:
+            if not isinstance(value, dict):
+                # For zendriver support. zendriver doesnt return objects {type, value}
+                results.append(value)
+                continue
+
+            # For nodriver support. nodriver returns objects {type, value}
+            results.append(value['value'])
+
+        return results
 
 class CFHelper:
     def __init__(self, _browser_tab: Tab, _debug: bool = False) -> None:
@@ -97,6 +158,7 @@ class CFHelper:
 
                     # Using javascript instead if find_all, because it's a lot faster than method used in nodriver
                     urls: list[str] = await self.cf_util.run_js("[...document.querySelectorAll('script[src]')].map(script => script.src)", return_value = True)
+
                     if not urls:
                         continue
 
