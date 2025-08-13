@@ -1,1 +1,2 @@
 nodriver>=0.45.0
+zendriver>=0.13.1
