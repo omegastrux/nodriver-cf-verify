@@ -1,9 +1,11 @@
-This project includes the use of the following open-source software:
+This project uses the following open-source software:
 
-- nodriver (https://github.com/ultrafunkamsterdam/nodriver)
+- nodriver – https://github.com/ultrafunkamsterdam/nodriver  
+  Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
+- zendriver – https://github.com/cdpdriver/zendriver  
   Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
 
-No changes have been made to the nodriver source code.
-This project communicates externally using nodriver's public API.
+No modifications have been made to the source code of nodriver or zendriver.
+This project interacts with them solely through their public APIs.
 
-We are not affiliated with the nodriver project or its authors.
+We are not affiliated with the nodriver or zendriver projects or their authors.
