@@ -9,8 +9,7 @@ A lightweight, asynchronous extension for **nodriver** and **zendriver** that de
 
 It automatically detects whether a webpage is protected by a Cloudflare Turnstile challenge and attempts to verify it using the browser automation interfaces provided by **nodriver** or **zendriver**.
 
-This extension is particularly useful for automating headless access to pages protected by Cloudflare's JavaScript- or iframe-based Turnstiles.
-
+This extension is particularly useful for automating headless access to pages protected by Cloudflare's JavaScript or iframe-based Turnstiles.
 
 
 ## ✅ Features
@@ -21,6 +20,7 @@ This extension is particularly useful for automating headless access to pages pr
 - Works asynchronously using `asyncio`.
 - Supports retrying with configurable intervals.
 - Provides support for the `nodriver` and `zendriver` libraries.
+- Can be run easily in Docker containers for isolated environments.
 
 
 ## ⚙️ Requirements
@@ -41,6 +41,60 @@ Make sure `nodriver` or `zendriver` is available in your environment.
 You can also install it manually:
 - pip install nodriver
 - pip install zendriver (optional, if preferred over `nodriver`)
+
+
+## 🐳 Quick Start with Docker
+
+You can run `nodriver-cf-verify` quickly using Docker. Follow these steps:
+
+
+### 1️⃣ Build the Docker image
+
+From the root of your project (where the `Dockerfile` is located):
+
+```bash
+docker build -t nodriver-cf-verify .
+```
+
+- `-t nodriver-cf-verify` sets the image name.
+- `.` uses the current directory as the build context.
+
+
+### 2️⃣ Run the container interactively
+
+```bash
+docker run -it --rm nodriver-cf-verify
+```
+
+- `-it` interactive mode (needed if running a browser in headful mode).
+- `--rm` removes the container after it exits.
+- This will execute the example script [`docker_example.py`](./docker_example.py) included in the project.
+
+
+### 3️⃣ Run the container in detached mode (background)
+
+```bash
+docker run -d --name cf-verify nodriver-cf-verify
+```
+
+- `-d` detached mode (runs in background).
+- `--name cf-verify` assigns a name to the container.
+
+
+### 4️⃣ Optional: Open a shell inside the container
+
+```bash
+docker exec -it cf-verify bash
+```
+
+- Useful for debugging, checking installed binaries, or testing scripts manually.
+
+
+### 5️⃣ Notes
+
+- The container includes **Brave browser** pre-installed and configured.
+- Ensure your scripts reference `CHROME_BIN=/usr/bin/brave-browser` if needed. However, this may not always work, so it's recommended to use `browser_executable_path` in the *nodriver* / *zendriver* options instead.
+- For headless automation, you can run the container as-is. For headful mode, make sure your environment supports GUI or use `Xvfb`.
 
 
 ## 💻 Example Usage with `nodriver` library
@@ -117,7 +171,7 @@ All source code for this project is provided in compliance with Section 13 of th
 
 - **nodriver** – <https://github.com/ultrafunkamsterdam/nodriver>
   Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
-- **zendriver** – <https://github.com/cdpdriver/zendriver>  
+- **zendriver** – <https://github.com/cdpdriver/zendriver>
   Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
 
 No modifications have been made to the source code of *nodriver* or *zendriver*.
