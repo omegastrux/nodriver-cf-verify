@@ -1,5 +1,5 @@
 # This file is part of nodriver-cf-verify.
-# Copyright (c) 2025 OMEGASTRUX
+# Copyright (c) 2026 OMEGASTRUX
 #
 # nodriver-cf-verify is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
@@ -20,7 +20,6 @@ import asyncio
 from datetime import datetime
 from typing import Optional, Any, Union
 
-
 class CFLibUtil:
     def __init__(self):
         """
@@ -30,6 +29,10 @@ class CFLibUtil:
 
         try:
             import nodriver
+        # Issue with nodriver related to a missing encoding declaration in the network.py file
+        except SyntaxError as e:
+            print(f"[ERROR - CFLibUtil]: A syntax error occurred while importing the nodriver library. Try updating nodriver or use zendriver instead: {e}")
+            nodriver = None
         except ImportError:
             nodriver = None
 
@@ -151,7 +154,7 @@ class CFHelper:
         urls: list[str] = []
 
         for i in range(_max_retries):
-            for i in range(5):
+            for y in range(5):
                 try:
                     if "turnstile" in await self.browser_tab.evaluate("document.title"):
                         return True
