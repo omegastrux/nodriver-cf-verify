@@ -1,9 +1,9 @@
-import nodriver, time
+import zendriver, asyncio, time
 from nodriver_cf_verify import CFVerify
 
 async def main() -> None:
-    browser: nodriver.Browser = await nodriver.start()
-    browser_tab: nodriver.Tab = await browser.get("https://nowsecure.nl")
+    browser: zendriver.Browser = await zendriver.start()
+    browser_tab: zendriver.Tab = await browser.get("https://nowsecure.nl")
 
     start: float = time.perf_counter()
 
@@ -18,4 +18,4 @@ async def main() -> None:
 
     print(f"Cloudflare was successfully verified in {duration:.2f} seconds.")
 
-nodriver.loop().run_until_complete(future = main())
+asyncio.run(main = main())

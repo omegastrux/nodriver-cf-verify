@@ -1,14 +1,14 @@
 # This script must be run via Docker using the provided Dockerfile
 
-import nodriver, time
+import zendriver, asyncio, time
 from nodriver_cf_verify import CFVerify
 
 async def main() -> None:
-    config = nodriver.Config(headless = True, browser_executable_path = "/usr/bin/brave-browser") # Using Brave because Chrome couldn't be verified in headless mode
+    config = zendriver.Config(headless = True, browser_executable_path = "/usr/bin/brave-browser") # Using Brave because Chrome couldn't be verified in headless mode
     config.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36") # Ensure the latest user-agent is set
 
-    browser: nodriver.Browser = await nodriver.start(config = config)
-    browser_tab: nodriver.Tab = await browser.get("https://nowsecure.nl")
+    browser: zendriver.Browser = await zendriver.start(config = config)
+    browser_tab: zendriver.Tab = await browser.get("https://nowsecure.nl")
 
     start: float = time.perf_counter()
 
@@ -23,4 +23,4 @@ async def main() -> None:
 
     print(f"Cloudflare was successfully verified in {duration:.2f} seconds.")
 
-nodriver.loop().run_until_complete(future = main())
+asyncio.run(main = main())
