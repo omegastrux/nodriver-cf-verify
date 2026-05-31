@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nodriver-cf-verify"
+version = "1.0.0"
+description = "A low-level, asynchronous Python extension designed to unify Cloudflare Turnstile challenge verification across both `nodriver` and `zendriver` runtimes."
+dependencies = [
+  nodriver>=0.45.0
+  zendriver>=0.13.1
+]
