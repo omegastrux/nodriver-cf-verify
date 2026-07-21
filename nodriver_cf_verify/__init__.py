@@ -14,11 +14,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with nodriver-cf-verify. If not, see <https://www.gnu.org/licenses/>.
 
-
-
 import asyncio
 from datetime import datetime
 from typing import Optional, Any, Union
+
+CLICK_LOCK = asyncio.Lock()
 
 class CFLibUtil:
     def __init__(self):
@@ -109,7 +109,6 @@ class CFUtil:
                 await asyncio.sleep(0.05)
                 continue
 
-            # instance_id: Optional[str] = f"{target_id[-5:]}-{target_url.split('/')[2]}"
             instance_id: Optional[str] = f"{target_id[-5:]}-{target_url}"
             await self.cf_logger.log(f"Created instance_id: {instance_id}")
             return instance_id
@@ -137,6 +136,7 @@ class CFUtil:
 
         return results
 
+
 class CFHelper:
     def __init__(self, _browser_tab: Tab, _debug: bool = False) -> None:
         self.debug: bool = _debug
@@ -159,7 +159,7 @@ class CFHelper:
                     if "turnstile" in await self.browser_tab.evaluate("document.title"):
                         return True
 
-                    # Using javascript instead if find_all, because it's a lot faster than method used in nodriver
+                    # Using javascript instead of find_all, because it's a lot faster than method used in nodriver
                     urls: list[str] = await self.cf_util.run_js("[...document.querySelectorAll('script[src]')].map(script => script.src)", return_value = True)
 
                     if not urls:
@@ -218,7 +218,7 @@ class CFHelper:
         """
         
         try:
-            iframes: list[Element] = [iframe for iframe in await self.browser_tab.find_all("iframe") if iframe.attrs.get("src")]
+            iframes: list[Element] = [iframe for iframe in await self.browser_tab.find_all("iframe", timeout=1) if iframe.attrs.get("src")]
 
             for iframe in iframes:
                 iframe_id: str = iframe.attrs.get("id", "").lower()
@@ -236,18 +236,11 @@ class CFHelper:
         except Exception as e:
             await self.cf_logger.log(f"Error occurred: {e}")
 
+
 class CFVerify:
     def __init__(self, _browser_tab: Tab, _debug: bool = False) -> None:
-        """
-        Initializes CFVerify with the given browser tab and debug flag.
-        Raises ValueError if arguments are of incorrect types.
-        """
-
         if not isinstance(_browser_tab, Tab):
             raise ValueError(f"_browser_tab parameter must be an instance of Tab")
-
-        if not isinstance(_debug, bool):
-            raise ValueError(f"_debug parameter must be a bool")
 
         self.debug: bool = _debug
         self.browser_tab: Tab = _browser_tab
@@ -258,72 +251,56 @@ class CFVerify:
         self.cf_logger: CFLogger = CFLogger(self.__class__.__name__, _debug = self.debug)
 
     async def log(self, message: str) -> None:
-        """
-        Logs a message prefixed by the instance ID.
-        If the instance ID is not set, it attempts to create it before logging.
-        """
-
         if not self.instance_id:
             self.instance_id = await self.cf_util.create_instance_id()
 
         await self.cf_logger.log(f"<{self.instance_id}>: {message}")
 
     async def verify(self, _max_retries = 10, _interval_between_retries = 1, _reload_page_after_n_retries = 0) -> bool:
-        """
-        Attempts to verify Cloudflare challenge by retrying up to _max_retries times.
-        Optionally reloads the page every _reload_page_after_n_retries attempts.
-        """
-
         await self.log("Verifying cloudflare has started")
 
         for retry_count in range(1, _max_retries + 1):
             await self.log(f"Trying to verify cloudflare. Attempt {retry_count} of {_max_retries}")
-
             await asyncio.sleep(delay = _interval_between_retries)
 
             if retry_count < _max_retries and _reload_page_after_n_retries > 0 and retry_count % _reload_page_after_n_retries == 0:
-                await self.log(f"Reloading page... Attempt {retry_count} of {_max_retries}, reload interval {_reload_page_after_n_retries}")
+                await self.log(f"Reloading page...")
                 await self.browser_tab.reload()
                 continue
 
             is_cloudflare_presented: bool = await self.cf_helper.is_cloudflare_presented()
 
-            if is_cloudflare_presented == True:
+            if is_cloudflare_presented:
                 await self.log(f"Cloudflare is presented on site")
 
                 iframe: Optional[Element] = await self.cf_helper.find_cloudflare_iframe()
-
                 if not iframe:
                     await self.log(f"No cloudflare iframe found. Retrying...")
                     continue
 
                 is_cloudflare_verified: Optional[bool] = await self.cf_helper.is_cloudflare_verified(iframe)
-
-                if is_cloudflare_verified == True:
+                if is_cloudflare_verified:
                     await self.log(f"Cloudflare has been verified successfully")
                     return True
 
                 try:
-                    await iframe.mouse_click()
-                    await self.log("Cloudflare iframe has been clicked")
+                    async with CLICK_LOCK:
+                        await self.log("Acquired lock, bringing tab to front for click...")
+                        
+                        # Bring tab into focus for CDP mouse event
+                        await self.browser_tab.activate()
+                        await asyncio.sleep(0.15)  # Brief delay for frame render
+
+                        # Trigger click action
+                        await iframe.mouse_click()
+                        await self.log("Cloudflare iframe has been clicked")
+
                 except Exception as e:
-                    await self.log("Error occured while clicking the iframe")
-
-                    if "could not find position for" in str(e):
-                        await self.log(f"Cloudflare iframe could not load properly")
-                        continue
-
+                    await self.log(f"Error occurred while clicking the iframe: {e}")
                     if not await self.cf_helper.is_cloudflare_presented():
-                        await self.log("Cloudflare has been verified successfully despite error")
                         return True
-
             else:
-                await self.log("Cloudflare not found on the page, probably cloudflare has been verified successfully")
+                await self.log("Cloudflare not found on the page, probably verified")
                 return True
 
-        if await self.cf_helper.is_cloudflare_presented():
-            await self.log("Cloudflare could not be verified")
-            return False
-        else:
-            await self.log("Cloudflare has been verified successfully...")
-            return True
+        return not (await self.cf_helper.is_cloudflare_presented())
