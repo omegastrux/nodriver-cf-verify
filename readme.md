@@ -27,13 +27,16 @@ The native upstream `nodriver` implementation includes a built-in `tab.cf_verify
 
 This extension mitigates that overhead completely by operating strictly within the logical layer of the DOM. By substituting computer vision analysis with deterministic state checks and automated CDP coordinate lookups, the execution loop remains lightweight and eliminates the need for any image-processing binaries.
 
+### 5. Concurrent Synchronization & Background Processing (`CLICK_LOCK`)
+To support parallel processing across multiple tabs or browser instances without race conditions, the engine utilizes a module-level `asyncio.Lock()` (`CLICK_LOCK`). All tabs can evaluate Cloudflare states concurrently in the background. The lock is acquired only for a fraction of a second when a tab needs to call `tab.activate()` and trigger the CDP `mouse_click()` event, guaranteeing that mouse interactions are sent to an active viewport without conflicting between parallel routines.
+
 ## Core Component Specification
 
 - **CFLibUtil**: Resolves cross-environment dependency injection and initializes unified type bindings.
 - **CFLogger**: Provides isolated asynchronous execution tracing using high-precision timestamp matching.
 - **CFUtil**: Handles execution of low-level JS payloads and provides cross-driver compatibility wrappers for data objects returned via CDP.
-- **CFHelper**: Evaluates active page signatures against known Cloudflare challenge platform endpoints, isolates target iframe elements using strict ID and class attribute heuristics, and executes deterministic token validation by checking widget state input values via DOM-isolated JavaScript queries.
-- **CFVerify**: Implements the main state machine loop, governing retries, automated page refresh triggers, and explicit coordinate-based cursor emulation (`mouse_click`).
+- **CFHelper**: Evaluates active page signatures against known Cloudflare challenge platform endpoints, isolates target iframe elements using strict ID/class attribute heuristics with reduced lookup timeouts (`timeout=1`), and executes deterministic token validation via DOM-isolated JavaScript queries.
+- **CFVerify**: Implements the main state machine loop governing retries, automated page refresh triggers, thread-safe tab focus synchronization (`CLICK_LOCK`), and explicit coordinate-based cursor emulation (`mouse_click`).
 
 ## Requirements
 - Python 3.9+
@@ -42,6 +45,19 @@ This extension mitigates that overhead completely by operating strictly within t
 ## Installation
 ```bash
 pip install git+https://github.com/omegastrux/nodriver-cf-verify.git
+```
+
+## Recommended Browser Arguments
+
+When running multiple tabs concurrently or processing background verification tasks, Chromium may throttle JavaScript timers or suspend background tab rendering. Passing the following startup flags ensures maximum verification speed and eliminates coordinate resolution failures on background tabs:
+
+```python
+RECOMMENDED_BROWSER_ARGS = [
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-component-update"
+]
 ```
 
 ## API Implementation Examples
@@ -55,8 +71,15 @@ import time
 from nodriver_cf_verify import CFVerify
 
 async def main() -> None:
-    # Initialize the core browser context
-    browser: nodriver.Browser = await nodriver.start()
+    # Initialize the core browser context with performance args
+    browser: nodriver.Browser = await nodriver.start(
+        browser_args=[
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-component-update"
+        ]
+    )
     browser_tab: nodriver.Tab = await browser.get("https://nowsecure.nl")
 
     start: float = time.perf_counter()
@@ -65,7 +88,7 @@ async def main() -> None:
     cf_verify: CFVerify = CFVerify(_browser_tab=browser_tab, _debug=True)
     success: bool = await cf_verify.verify(
         _max_retries=15, 
-        _interval_between_retries=1.0, 
+        _interval_between_retries=1, 
         _reload_page_after_n_retries=5
     )
 
@@ -92,7 +115,14 @@ import time
 from nodriver_cf_verify import CFVerify
 
 async def main() -> None:
-    browser: zendriver.Browser = await zendriver.start()
+    browser: zendriver.Browser = await zendriver.start(
+        browser_args=[
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-component-update"
+        ]
+    )
     browser_tab: zendriver.Tab = await browser.get("https://nowsecure.nl")
 
     start: float = time.perf_counter()
@@ -100,7 +130,7 @@ async def main() -> None:
     cf_verify: CFVerify = CFVerify(_browser_tab=browser_tab, _debug=True)
     success: bool = await cf_verify.verify(
         _max_retries=15, 
-        _interval_between_retries=1.0, 
+        _interval_between_retries=1, 
         _reload_page_after_n_retries=0
     )
 
@@ -118,15 +148,67 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+### Concurrent Multi-Tab Execution (`asyncio.gather`)
+
+```python
+import zendriver
+import asyncio
+import time
+from nodriver_cf_verify import CFVerify
+
+async def verify_tab(tab: zendriver.Tab, tab_idx: int) -> bool:
+    print(f"[Tab {tab_idx}] Starting verification...")
+    return await CFVerify(tab, _debug=True).verify(
+        _max_retries=10,
+        _interval_between_retries=1
+    )
+
+async def main() -> None:
+    urls = [
+        "https://nowsecure.nl",
+        "https://nowsecure.nl",
+        "https://nowsecure.nl",
+        "https://nowsecure.nl"
+    ]
+
+    browser: zendriver.Browser = await zendriver.start(
+        browser_args=[
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-component-update"
+        ]
+    )
+
+    tabs = []
+    for url in urls:
+        tabs.append(await browser.get(url, new_tab=True))
+
+    start = time.perf_counter()
+
+    # Execute parallel verification across all tabs
+    tasks = [verify_tab(tab, idx + 1) for idx, tab in enumerate(tabs)]
+    results = await asyncio.gather(*tasks)
+
+    duration = time.perf_counter() - start
+    success_count = sum(1 for res in results if res is True)
+
+    print(f"Verified {success_count}/{len(urls)} tabs in {duration:.2f} seconds")
+    await browser.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 ## Containerized Deployment via Docker
 
-The repository provides an automated deployment architecture via a `Dockerfile` based on the official `python:3.12-slim` image. To minimize the container footprint, this extension bypasses heavy computer vision dependencies like OpenCV, provisioning the environment strictly with basic Unix utilities and the Brave browser engine.
+The repository provides an automated deployment architecture via a `Dockerfile` based on the official `python:3.12-slim` image. To minimize the container footprint while bypassing native headless anti-bot flags, the image provisions system dependencies strictly with standard Debian `chromium` and `Xvfb` (X Virtual Framebuffer).
 
-Brave is utilized instead of standard Chromium to mitigate automated telemetry flags during headless execution. Consequently, containerized deployments require explicit runtime overrides to match this environment, specifically binding the driver to the internal execution path (`/usr/bin/brave-browser`) and injecting an updated User-Agent header string.
+Headless environments or privacy-focused browsers using dynamic canvas noise (like Brave's Farbling) can cause Cloudflare Turnstile scripts to stall on initial loading checks. To resolve this inside headless server environments, the container executes standard Chromium in non-headless mode (`headless=False`) rendered inside an isolated Xvfb virtual display memory layer.
 
 ### Docker Execution Example
 
-The following script demonstrates how to initialize the `zendriver` context properly within the containerized environment to handle headless verification:
+The following minimal script demonstrates how to initialize `zendriver` inside the containerized Xvfb environment:
 
 ```python
 import zendriver
@@ -135,12 +217,17 @@ import time
 from nodriver_cf_verify import CFVerify
 
 async def main() -> None:
-    # Explicitly bind to the containerized Brave browser binary path
-    config = zendriver.Config(headless=True, browser_executable_path="/usr/bin/brave-browser")
-    # Inject a clean User-Agent header string
-    config.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36")
-
-    browser: zendriver.Browser = await zendriver.start(config=config)
+    # Explicitly bind to the containerized Chromium binary path inside Xvfb
+    browser: zendriver.Browser = await zendriver.start(
+        browser_executable_path="/usr/bin/chromium",
+        headless=False,
+        browser_args=[
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-component-update"
+        ]
+    )
     browser_tab: zendriver.Tab = await browser.get("https://nowsecure.nl")
 
     start: float = time.perf_counter()
@@ -156,9 +243,11 @@ async def main() -> None:
 
     if not success:
         print(f"Failed to verify Cloudflare. Elapsed time: {duration:.2f} seconds")
+        await browser.stop()
         return
 
     print(f"Cloudflare was successfully verified in {duration:.2f} seconds")
+    await browser.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -171,14 +260,14 @@ Build the local container image using the present directory context:
 docker build -t nodriver-cf-verify .
 ```
 
-Run the container in interactive mode:
+Run the container in interactive mode with host IPC memory sharing:
 ```bash
-docker run -it --rm nodriver-cf-verify
+docker run -it --rm --ipc=host nodriver-cf-verify
 ```
 
 Deploy the container to run persistently in a detached background state:
 ```bash
-docker run -d --name cf-verify nodriver-cf-verify
+docker run -d --name cf-verify --ipc=host nodriver-cf-verify
 ```
 
 ## Verification Loop Behavior
@@ -187,7 +276,7 @@ The `verify()` method runs an iterative control loop processing the following ex
 1. Evaluates page signatures via `CFHelper.is_cloudflare_presented`. If no challenge signature is identified, execution returns early with a success code.
 2. Locates target iframes matching validation criteria. If the signature exists but the iframe element is missing from the active DOM context, the loop skips the current tick and retries.
 3. Executes `CFHelper.is_cloudflare_verified` via direct JS evaluation against the target element `input#cf-chl-widget-{unique_id}_response`. If the value attribute is non-empty, the challenge is marked as resolved and execution terminates with a true status.
-4. If the value field remains empty, the engine fires an isolated coordinate pointer injection (`mouse_click()`) directly into the target frame boundaries to force user interaction.
+4. Acquires the shared `CLICK_LOCK` to safely bring the tab into foreground focus (`tab.activate()`), then fires an isolated coordinate pointer injection (`mouse_click()`) directly into the target frame boundaries.
 5. Catches positional frame exception faults, logging rendering pipeline errors and enforcing isolated fallback runtime delays before recycling the iteration.
 6. If the loop completes all iterations without an early return, the method executes a final evaluation check. If `is_cloudflare_presented` still returns true, it logs a verification failure and returns false; otherwise, it confirms successful verification and returns true.
 
